@@ -1,0 +1,628 @@
+## R codes following the article: 
+## Y, Xie, J. Yu, and B. Ranneby (2009): Forecasting using locally stationary wavelet processes. Journal of
+## of the Statistical Computation and Simulation, 79:9, 1067-1082.
+## Please quote the reference if you want to use the codes. No further distribute without the permission from the authors.
+
+own.modwt<-function(x, wave = "s8", n.level = ifelse( (wave=="haar"),floor(logb(length(x), 2.)),floor(logb(length(x)/(as.numeric(substring(wave,2))-1),2))), need.scale = F)
+{
+	N <- length(x)
+	if(n.level > logb(N, 2))
+		stop("The level to transform exceeds the limit!")
+	h <- own.filter(wave)$hpf
+	g <- own.filter(wave)$lpf
+	L <- length(h)
+	if(N < 2*(L - 1) * 2^(n.level - 1))
+		stop("The wavelet coefficients are all zero for some levels!")
+	W.coef <- matrix(nr = n.level, nc = N)
+	V.coef <- matrix(nr = n.level + 1, nc = N)
+	V.coef[1,  ] <- x
+	for(j in 1:n.level) {
+		for(tt in (2*(L-1)*2^(j-1)):N) {
+			k <- tt
+			W.coef[j, tt] <- h[1] * V.coef[j, k]
+			V.coef[j + 1, tt] <- g[1] * V.coef[j, k]
+			for(n in 2:L) {
+				k <- k - 2^(j - 1)
+				W.coef[j, tt] <- W.coef[j, tt] + h[n] * V.coef[j, k]
+				V.coef[j + 1, tt] <- V.coef[j + 1, tt] + g[n] * V.coef[j, k]
+				 		}
+		}
+		for(tt in (2*(L-1)*2^(j-1)-1):1) {
+			W.coef[j,tt]<- W.coef[j,2*(L-1)*2^(j-1)]	
+			V.coef[j+1,tt]<-0 ## Needed?
+		}
+
+	}
+	W.coef <- W.coef^2
+	if(need.scale) W.coef<- rbind(W.coef, V.coef[n.level+1,]^2)
+	return(list(TT = N, S = c(t(W.coef))))
+}
+
+
+own.filter<-function(name)
+{
+	## The order of la's and d's are same as Daubechies, not Percival and Walden:WMTSA
+	select.haar <- function()
+	{
+		L <- 2
+		g <- c(0.707106781186547, 0.707106781186547)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	
+	select.mb4 <- function()
+	{
+		L <- 4
+		g <- c(0.4801755, 0.8372545, 0.2269312, -0.1301477)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.bs3.1 <- function()
+	{
+		L <- 4
+		g <- c(0.1767767, 0.5303301, 0.5303301, 0.1767767)
+		h <- qmf(g)
+		gd <- c(0.3535534, 1.06066, -1.06066, -0.3535534)
+		hd <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g, dhpf = hd, dlpf = gd))
+	}
+	select.w4 <- function()
+	{
+		L <- 4
+		g <- c(-1, 3, 3, -1)/8
+		h <- c(-1, 3, -3, 1)/8
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.fk4 <- function()
+	{
+		L <- 4
+		g <- c(0.653927555569765, 0.753272492839487, 0.0531792287790598, -0.0461657148152177)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	
+	select.fk6 <- function()
+	{
+		L <- 6
+		g <- c(0.42791503242231, 0.812919643136907, 0.356369511070187, -0.146438681272577, -0.0771777574069701, 0.0406258144232379)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.c6 <- function()
+	{
+		L <- 6
+		g <- c(-0.0156557285289848, -0.0727326213410511, 0.384864856538113, 0.85257204164239, 0.337897670951159, -0.0727322757411889)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.c12 <- function()
+	{
+		L <- 12
+		g <- c(-0.0007205494453679, -0.0018232088707116, 0.0056114348194211, 0.0236801719464464, -0.0594344186467388, -0.0764885990786692, 0.417005184423671, 0.812723635449398, 0.386110066822994, -0.0673725547222826, -0.0414649367819558, 0.0163873364635998)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.c18 <- function()
+	{
+		L <- 18
+		g <- c(-3.45997728362e-005, -7.09833031381e-005, 0.0004662169601129, 0.0011175187708906, -0.0025745176887502, -0.0090079761366615, 0.0158805448636158, 0.0345550275730615, -0.0823019271068856, -0.0717998216193117, 0.428483476377617, 0.793777222625617, 0.405176902409615, -0.0611233900026726, -0.0657719112818552, 0.0234526961418362, 0.0077825964273254, -0.003793512864491)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.c24 <- function()
+	{
+		L <- 24
+		g <- c(-1.7849850031e-006, -3.2596802369e-006, 3.12298758654e-005, 6.2339034461e-005, -0.0002599745524878, -0.0005890207562444, 0.0012665619292991, 0.003751436157279, -0.0056582866866115, -0.0152117315279485, 0.0250822618448678, 0.0393344271233433, -0.0962204420340021, -0.0666274742634348, 0.434386056491532, 0.782238930920613, 0.415308407030491, -0.056077313316763, -0.0812666996808907, 0.026682300156057, 0.0160689439647787, -0.0073461663276432, -0.001629492012602, 0.0008923136685824)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.c30 <- function()
+	{
+		L <- 30
+		g <- c(-9.51765727e-008, -1.674428858e-007, 2.0637618516e-006, 3.7346551755e-006, -2.13150268122e-005, -4.13404322768e-005, 0.0001405411497166, 0.0003022595818445, -0.0006381313431115, -0.001662863702186, 0.0024333732129107, 0.0067641854487565, -0.0091642311634348, -0.0197617789446276, 0.0326835742705106, 0.0412892087544753, -0.105574208714318, -0.0620359639693546, 0.437991626217383, 0.774289603733474, 0.42156620673469, -0.0520431631816557, -0.0919200105692549, 0.0281680289738655, 0.0234081567882734, -0.0101311175209033, -0.0041593587818186, 0.0021782363583355, 0.000358589687933, -0.0002120808398259)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	
+	select.fk8 <- function()
+	{
+		L <- 8
+		g <- c(0.3492381118638, 0.782683620384065, 0.475265135079471, -0.0996833284505732, -0.15997809743403, 0.0431066681065162, 0.0425816316775818, -0.0190001788537359)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.s8 <- function()
+	{
+		L <- 8
+		g <- c(-0.0757657147893567, -0.0296355276459604, 0.497618667632563, 0.803738751805386, 0.297857795605605, -0.0992195435769564, -0.0126039672622638, 0.0322231006040782)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.s10 <- function()
+	{
+		L <- 10
+		g <- rev(c(0.0195388827353869 - 0.0211018340249298, -0.175328089908108, 0.0166021057644243, 0.633978963456949, 0.723407690403808, 0.199397533976996, -0.0391342493025834, 0.0295194909260734, 0.0273330683451645))
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.s12 <- function()
+	{
+		L <- 12
+		g <- c(0.0154041093273377, 0.0034907120843304, -0.117990111148411, -0.0483117425859981, 0.49105594192764, 0.787641141028794, 0.33792942172824, -0.0726375227866, -0.0210602925126954, 0.0447249017707482, 0.0017677118643983, -0.007800708324765)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.s14 <- function()
+	{
+		L <- 14
+		g <- rev(c(0.0102681767084968, 0.0040102448717033, -0.107808237703617, -0.140047240442703, 0.288629631750983, 0.767764317004571, 0.536101917090772, 0.0174412550871099, -0.049552834937041, 0.0678926935015971, 0.0305155131659062, -0.0126363034031526, -0.0010473848889657, 0.0026818145681164))
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.s16 <- function()
+	{
+		L <- 16
+		g <- rev(c(-0.0033824159513594, -0.0005421323316355, 0.0316950878103452, 0.0076074873252848, -0.143294238351054, -0.0612733590679088, 0.481359651259201, 0.777185751699748, 0.364441894835956, -0.0519458381078751, -0.0272190299168137, 0.0491371796734768, 0.0038087520140601, -0.0149522583367926, -0.0003029205145516, 0.0018899503329007))
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.s18 <- function()
+	{
+		L <- 18
+		g <- c( 0.0010694900326538,
+-0.0004731544985879,
+-0.0102640640276849,
+ 0.0088592674935117,
+ 0.0620777893027638,
+-0.0182337707798257,
+-0.1915508312964873,
+ 0.0352724880359345,
+ 0.6173384491413523,
+ 0.7178970827642257,
+ 0.2387609146074182,
+-0.0545689584305765,
+ 0.0005834627463312,
+ 0.0302248788579895,
+-0.0115282102079848,
+-0.0132719677815332,
+ 0.0006197808890549,
+ 0.0014009155255716
+)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.s20 <- function()
+	{
+		L <- 20
+		g <- c(0.000770159809103, 9.56326707837e-005, -0.0086412992759401, -0.0014653825833465, 0.0459272392237649, 0.0116098939129724, -0.159494278857531, -0.0708805358108615, 0.471690666842659, 0.769510037014339, 0.383826761225382, -0.0355367403054689, -0.0319900568281631, 0.049994972079156, 0.0057649120455518, -0.020354939803946, -0.000804358934537, 0.0045931735836703, 5.7036084339e-005, -0.0004593294205481)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.mb8 <- function()
+	{
+		L <- 8
+		g <- rev(c(-0.1673619, 0.01847751, 0.5725771, 0.7351331, 0.2947855, -0.1108673, 0.007106015, 0.06436345))
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d4 <- function()
+	{
+		L <- 4
+		g <- c(0.482962913144534, 0.836516303737808, 0.224143868042013, -0.12940952255126)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d6 <- function()
+	{
+		L <- 6
+		g <- c( 0.3326705529500827,
+ 0.8068915093110928,
+ 0.4598775021184915,
+-0.1350110200102546,
+-0.0854412738820267,
+ 0.0352262918857096
+)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d8 <- function()
+	{
+		L <- 8
+		g <- c(0.230377813307443, 0.714846570548406, 0.630880767935879, -0.0279837694166834, -0.187034811717913, 0.0308413818353661, 0.0328830116666778, -0.0105974017850021)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d10 <- function()
+	{
+		L <- 10
+		g <- c(0.160102397974193, 0.60382926979719, 0.724308528437773, 0.13842814590132, -0.242294887066382, -0.0322448695846381, 0.0775714938400459, -0.0062414902127983, -0.012580751999082, 0.0033357252854738)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d12 <- function()
+	{
+		L <- 12
+		g <- c(0.111540743350109, 0.494623890398453, 0.751133908021095, 0.315250351709198, -0.22626469396544, -0.129766867567262, 0.0975016055873224, 0.0275228655303053, -0.0315820393174862, 0.0005538422011614, 0.0047772575109455, -0.0010773010853085)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d14 <- function()
+	{
+		L <- 14
+		g <- c(0.0778520540850081, 0.396539319481914, 0.729132090846237, 0.469782287405215, -0.143906003928529, -0.224036184993854, 0.0713092192668312, 0.080612609151082, -0.0380299369350125, -0.0165745416306664, 0.0125509985560993, 0.0004295779729214, -0.0018016407040474, 0.0003537137999745)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d16 <- function()
+	{
+		L <- 16
+		g <- c(0.0544158422431049, 0.312871590914303, 0.67563073629729, 0.585354683654191, -0.0158291052563816, -0.28401554296157, 0.0004724845739124, 0.128747426620484, -0.0173693010018083, -0.0440882539307952, 0.0139810279173995, 0.0087460940474061, -0.0048703529934518, -0.000391740373377, 0.0006754494064506, -0.0001174767841248)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d18 <- function()
+	{
+		L <- 18
+		g <- c(0.0380779473638791, 0.243834674612594, 0.604823123690116, 0.657288078051296, 0.133197385824993, -0.293273783279176, -0.0968407832229524, 0.148540749338131, 0.0307256814793395, -0.0676328290613302, 0.000250947114834, 0.0223616621236805, -0.004723204757752, -0.0042815036824636, 0.0018476468830564, 0.0002303857635232, -0.0002519631889427, 3.93473203163e-005)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.d20 <- function()
+	{
+		L <- 20
+		g <- c(0.0266700579005546, 0.188176800077686, 0.52720118893172, 0.688459039453625, 0.281172343660649, -0.249846424327228, -0.19594627437734, 0.127369340335789, 0.0930573646035802, -0.0713941471663697, -0.029457536821848, 0.0332126740593703, 0.003606553566988, -0.0107331754833036, 0.0013953517470692, 0.001992405295193, -0.0006858566949566, -0.0001164668551285, 9.35886703202e-005, -1.32642028945e-005)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.bl14 <- function()
+	{
+		L <- 14
+		g <- c(0.0120154192834842, 0.0172133762994439, -0.0649080035533744, -0.064131289818917, 0.360218460898555, 0.781921593296555, 0.483610915693782, -0.0568044768822707, -0.101010920866413, 0.0447423494687405, 0.0204642075778225, -0.0181266051311065, -0.0032832978473081, 0.0022918339541009)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.fk14 <- function()
+	{
+		L <- 14
+		g <- c(0.260371769291396, 0.686891477239599, 0.611554653959511, 0.0514216541421191, -0.245613928162192, -0.0485753390858553, 0.124282560921513, 0.0222267396224631, -0.0639973730391417, -0.00507437254997285, 0.029779711590379, -0.00329747915270872, -0.00927061337444824, 0.00351410097043596)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.mb16 <- function()
+	{
+		L <- 16
+		g <- rev(c(-0.0130277, 0.02173677, 0.1136116, -0.0577657, -0.2278359, 0.1188725, 0.6349228, 0.6701646, 0.2345342, -0.05656657, -0.01987986, 0.05474628, -0.02483876, -0.04984698, 0.009620427, 0.005765899))
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.bl20 <- function()
+	{
+		L <- 20
+		g <- c(0.0008625782242896, 0.0007154205305517, -0.0070567640909701, 0.0005956827305406, 0.0496861265075979, 0.0262403647054251, -0.121552106157816, -0.0150192395413644, 0.513709872833405, 0.766954836501085, 0.340216013511079, -0.0878787107378667, -0.0670899071680668, 0.0338423550064691, -0.0008687519578684, -0.0230054612862905, -0.0011404297773324, 0.0050716491945793, 0.0003401492622332, -0.0004101159165852)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.fk22 <- function()
+	{
+		L <- 22
+		g <- c(0.193896107759957, 0.589452190929428, 0.670084962942026, 0.21562984913477, -0.228028855771577, -0.164465715268843, 0.11154914372207, 0.110155264934066, -0.0660845167937792, -0.0718416819231261, 0.0435423676255571, 0.0447752121844098, -0.0297428807492741, -0.0259708730890212, 0.020284486066678, 0.0129642494110898, -0.0128859905624436, -0.00483843263644019, 0.00717380316527169, 0.00036128556221949, -0.00267699163858104, 0.000880577368638464)
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	select.mb24 <- function()
+	{
+		L <- 24
+		g <- rev(c(-2.132706e-005, 0.0004745736, 0.0007456041, -0.004879053, -0.001482995, 0.04199576, -0.002658282, -0.006559513, 0.1019512, 0.1689456, 0.1243531, 0.1949147, 0.4581101, 0.6176385, 0.2556731, -0.3091111, -0.3622424, -0.004575448, 0.1479342, 0.01027154, -0.01644859, -0.002062335, 0.001193006, 5.361301e-005))
+		h <- qmf(g)
+		return(list(length = L, hpf = h, lpf = g))
+	}
+	#cat("These filters are not so accurate as those in S-plus!\n")
+	switch(name,
+		haar = select.haar(),
+		d4 = select.d4(),
+		mb4 = select.mb4(),
+		w4 = select.w4(),
+		bs3.1 = select.bs3.1(),
+		fk4 = select.fk4(),
+		d6 = select.d6(),
+		fk6 = select.fk6(),
+		c6 = select.c6(),
+		c12 = select.c12(),
+		c18 = select.c18(),
+		c24 = select.c24(),
+		c30 = select.c30(),
+		d8 = select.d8(),
+		d10 = select.d10(),
+		d12 = select.d12(),
+		d14 = select.d14(),
+		d16 = select.d16(),
+		d18 = select.d18(),
+		d20 = select.d20(),
+		fk8 = select.fk8(),
+		s8 = select.s8(),
+		s10 = select.s10(),
+		s12 = select.s12(),
+		s14 = select.s14(),
+		s16 = select.s16(),
+		s18 = select.s18(),
+		s20 = select.s20(),
+		mb8 = select.mb8(),
+		bl14 = select.bl14(),
+		fk14 = select.fk14(),
+		mb16 = select.mb16(),
+		la8 = select.s8(),
+		la10 = select.s10(),
+		la12 = select.s12(),
+		la14 = select.s14(),
+		la16 = select.s16(),
+		la18 = select.s18(),
+		la20 = select.s20(),
+		bl20 = select.bl20(),
+		fk22 = select.fk22(),
+		mb24 = select.mb24(),
+		stop("Invalid selection for wave.filter"))
+}
+
+qmf<-function(g, low2high = TRUE)
+{
+	L <- length(g)
+	if(low2high)
+		h <- (-1)^(0:(L - 1)) * rev(g)
+	else h <- (-1)^(1:L) * rev(g)
+	return(h)
+}
+
+
+
+pred.new.new<-function(x, sp = uncor.spec(x), h = 1., p = 5., kernel = "normal", g =max(ceiling(h*2/3)+1, 30.),wave="s8")
+{
+	#cat("h:",h," p:",p, " g:",g,"\n")
+	len <- length(x)
+	pr <- predeq.est.new(sp, h, p, kernel = kernel, g = g,wave=wave)
+	b <- eigen(pr$B)$vectors[,p]
+	mean <- sum(x[(len - p + 1.):len] * b)
+	std.err <- sqrt(max(sig.sq(pr, b), 0.))
+	return(list(p=p, mean=mean, std.err=std.err,B=pr$B,RHS=pr$RHS))
+}
+
+predeq.est.new<-function(uncspec, h = 1., p = uncspec$TT, smooth = T, kernel = "normal", g = 30., max.lag = p - 1.,wave="s8")
+{
+	B <- matrix(0., p, p)
+	RHS <- rep(0., p)
+	if(max.lag > 0.)
+		for(lag in 1.:max.lag) {
+			indices <- seq(from = lag * p + 1., by = p + 1., to = p^2. - lag)
+			v <- loc.cov.unc.new(uncspec, lag, p - lag, smooth, kernel, g, h,wave=wave)
+			B[indices] <- v$lcov
+			if(h <= lag)
+				RHS[p + h - lag] <- v$extrapolated
+		}
+	B <- t(B) + B
+	v <- loc.cov.unc.new(uncspec, 0., p, smooth, kernel, g, h,wave=wave)
+	diag(B) <- v$lcov
+	extra.var <- v$extrapolated
+	return(list(B=B, RHS=RHS, extra.var=extra.var))
+}
+
+loc.cov.unc.new<-function(uncspec, lag, req.length = uncspec$TT - lag, smooth = T, kernel = "normal", g = 50., extrap.lag = 1.,wave="s8")
+{
+	TT <- uncspec$TT
+	J <- length(uncspec$S)/TT
+	if (wave=="haar"){ A<-A.haar(J)}
+	else {A<-eval(as.name(paste(wave,".10",sep="")))[1:J,1:J]}
+	Ainv <- solve(A)
+	indices.S <-max(lag + 1., TT - req.length - 3. * g + 1.):TT ## (TT-req.length):TT ##
+	indices <- indices.S - lag/2.
+	loccov <- rep(0., length(indices))
+	L<-ifelse((wave=="haar"),2,as.numeric(substring(wave,2)))
+	#cat("L for ,",wave, " is ", L,".\n")
+	N<-(2^J - 1) * (L - 1) + 1
+	if (wave=="haar") {acf<-haar.acf((-1.):( - J), lag)}
+	else {acf <- eval(as.name(paste(wave,"acw.",J,sep="")))[,c(lag)+N]}
+	weights <- Ainv %*% acf
+	for(j in 1.:J){
+		loccov <- loccov + weights[j] * uncspec$S[(j - 1.) * TT + indices.S]
+		}
+	if(smooth) {
+		x.p <- c(indices, indices[length(indices)] + extrap.lag)
+		if (g< 2*extrap.lag/3+1) {
+			#cat("Bandwidth is ",g)
+			g<-ceiling(2*extrap.lag/3)+1
+			#cat(" and set to be ",g, "\n")
+				}		
+		loccov <- ksmooth(indices, loccov, kernel = kernel, bandwidth = g, x.points = x.p)$y
+		lcov <- loccov[(length(loccov) - req.length):(length(loccov) - 1.)]
+		extrapolated <- loccov[length(loccov)]
+	}
+	else {
+		lcov <- loccov[(length(loccov) - req.length + 1.):(length(loccov))]
+		extrapolated <- loccov[length(loccov)]
+	}
+	return(list(lcov=lcov, extrapolated=extrapolated))
+}
+
+A.haar<-function(J)
+{
+	A <- matrix(0., J, J)
+	if(J == 1.)
+		A[1., 1.] <- 1.5
+	else {
+		for(j in 1.:(J - 1.))
+			for(l in (j + 1.):J)
+				A[j, l] <- 2.^( - l) * (2.^(2. * j - 1.) + 1.)
+		A <- A + t(A)
+		for(j in 1.:J)
+			A[j, j] <- (2.^(2. * j) + 5.)/(3. * 2.^j)
+		return(A)
+	}
+}
+
+haar.acf<-function(j, tau)
+{
+	cc <- 2.^( - j - 1.)
+	res <- (2. * pmax(cc - abs(tau), 0.) - pmax(pmin(cc + tau, 2. * cc) - pmax(cc, tau), 0.) - pmax(pmin(2. * cc + tau, cc) - pmax(cc + tau, 0.), 0.))/(2. * cc)
+	return(res)
+}
+
+
+sig.sq<-function(predeq, minimiser = solve(predeq$B, predeq$RHS))
+{
+	s <- length(predeq$RHS)
+	B <- matrix(0., s + 1., s + 1.)
+	B[1.:s, 1.:s] <- predeq$B
+	B[1.:s, s + 1.] <- predeq$RHS
+	B[s + 1., 1.:s] <- predeq$RHS
+	B[s + 1., s + 1.] <- predeq$extra.var
+	b <- c(minimiser, -1.)
+	sqerr <- sum(b * (B %*% b))
+	return(sqerr)
+}
+
+
+
+adjust.new.new<-function(x, wave = "d4", n.level = 6, sp = own.modwt(x,n.level = n.level, wave = wave), h = 1., s = 20., start.p = 5., start.g = (ceiling(h*2/3)+ifelse((h<=25),5,10)), criterion = "comfortable.fit", g.update.step = 1., attit = "adventurous", pars.updated.at.once = 2., max.no.of.descents = ifelse((h<=25),2,3), max.p = max(10, 2 * h), limits.g = c(ceiling(2*h/3)+1, max(100., h)), kernel = "normal")
+{
+	## 12 changes: 1. the max.p change from 10 to max(10, 2*h)
+	## 2. max.no.of.descents from 1 to ifelse((h<=100),2,3)
+	## 3. p[1.] now is max(start.p, h+1) instead of max(start.p,h)
+	## 7. The limits of g is (.,max(100,h)) instead of constant (10,100).
+	## 9: start.g is now (.) instead of 30 for sake of smooth.spline and accuracy.
+	g <- rep(0., s + 1.)
+	p <- rep(0., s + 1.)
+	xhat <- rep(0., s)
+	sqdist <- rep(0., s)
+	sig <- rep(0., s)
+	fits.in <- rep(0., s)
+	g[1.] <- start.g
+	p[1.] <- start.p #max(start.p, h + 1)
+	len <- length(x)
+	for(i in s:1.) {
+		##print(i)
+		x.temp <- x[1.:(len - i - h + 1.)]
+		sp.temp <- clip.spec(sp, 1., len - i - h + 1.)
+		pr <- pred.new.new(x.temp, sp.temp, h, p[s - i + 1.], kernel, g[s - i + 1.],wave=wave)
+		xhat[s - i + 1.] <- pr$mean
+		##print(pr$mean)
+		sig[s - i + 1.] <- pr$std.err
+		##print(pr$std.err)
+		sqdist[s - i + 1.] <- (x[len - i + 1.] - xhat[s - i + 1.])^2.
+		##print(sqdist[s-i+1.])
+		fits.in[s - i + 1.] <- (sqrt(sqdist[s - i + 1.]) <= 1.96 * sig[s - i + 1.])
+		##print(fits.in[s - i + 1])
+		if(attit == "conservative" & fits.in[s - i + 1.]) {
+			g[s - i + 2.] <- g[s - i + 1.]
+			p[s - i + 2.] <- p[s - i + 1.]
+		}
+		else {
+			current.g <- g[s - i + 1.]
+			current.p <- p[s - i + 1.]
+			cont <- T
+			j <- 1.
+			while(cont) {
+				A <- matrix(Inf, 3., 3.)
+				A2 <- matrix(Inf, 3., 3.)
+				B <- matrix(0., 3., 3.)
+				for(k in 1.:3.)
+					for(l in 1.:3.)
+						if(current.p + (l - 2.) >= h & current.p + (l - 2.) <= max.p & current.g + (k - 2.) * g.update.step <= limits.g[2.] & current.g + (k - 2.) * g.update.step >= limits.g[1.]) if(pars.updated.at.once == 2. | k == 2. | l == 2.) {
+								pr <- pred.new.new(x.temp, sp.temp, h, current.p + (l - 2.), kernel, current.g + (k - 2.) * g.update.step,wave=wave)
+								A[k, l] <- abs(x[len - i + 1.] - pr$mean)
+								A2[k, l] <- abs((x[len - i + 1.] - pr$mean)/x[len - i + 1.])
+								B[k, l] <- 1.96 * pr$std.err
+							}
+				if(criterion == "min.re") {
+					index <- which(A2 == min(A2))
+					}
+				else {
+					if(criterion == "comfortable.fit")
+						index <- which(A/B == min(A/B))
+					else if(criterion == "min.distance") {
+						if (length(A[A <= B])>0)  #change 11: In case of zero length, min returns 'Inf', which will mix with orignal 'Inf' in A.
+							index <- which(A == min(A[A <= B]))
+						else index<- numeric(0)
+						if(length(index) > 1.)
+							index <- which(B == min(B[which(A == min(A[A <= B]))]))
+						else if(length(index) == 0.)
+							index <- which(A/B == min(A/B))
+											}
+					}
+				if(length(index) == 0) {
+					warning("Comparison doesn't work!\n")
+					index <- 5
+								}
+					## 5. In case of problem
+				#print(index)
+				if(length(index) > 1) {index <- index[1]; cat("\nChange 6 happens!\n")}
+				# 6. In case of multiple choice, we choose the first one
+				cont <- (A[index] > B[index] & j < max.no.of.descents & (((index - 1.) %/% 3.) - 1. != 0. | ((index - 1.) %% 3.) - 1. != 0.))
+				
+		      	current.p <- current.p + (((index - 1.) %/% 3.) - 1.)
+			      if (current.p==0) current.p<-1
+				#8: Also problem handle
+				current.g <- current.g + (((index - 1.) %% 3.) - 1.) * g.update.step
+				if (i>1 && current.g< 2*h/3+2){
+					current.g<-ceiling(2*h/3)+2
+				#	cat("Warning: The selected current.g is near the bound of ksmooth,\nand added by 1.\n")
+						             }
+				# 10: Increase the bandwidth when 'ksmooth' has problem.
+				j <- j + 1.
+			}
+		p[s - i + 2.] <- current.p
+		g[s - i + 2.] <- current.g
+		}
+	}
+	actual <- x[(len - s + 1.):len]
+	percent.fits.in <- sum(fits.in)/length(fits.in)
+	return(list(xhat=xhat, sig=sig, actual=actual, sqdist=sqdist, p=p, g=g, fits.in=fits.in, percent.fits.in=percent.fits.in))
+}
+
+
+clip.spec<-function(uncspec, beg, endd)
+{
+	TT <- uncspec$TT
+	J <- length(uncspec$S)/TT
+	S <- numeric()
+	##J <- floor(logb(TT, 2.))
+	for(j in 1.:J)
+		S <- c(S, uncspec$S[(j - 1.) * TT + (beg:endd)])
+	TT <- endd - beg + 1.
+	return(list(TT=TT, S=S))
+}
+
+hper<-function(x,J =floor(logb(TT, 2.)))
+{
+	TT <- length(x)
+	
+	d <- rep(0., J * TT)
+	temp <- x
+	for(j in (-1.):( - J)) {
+		gap <- 2.^( - j - 1.)
+		for(k in TT:(2. * gap)) {
+			d[( - j - 1.) * TT + k] <- (temp[k] - temp[k - gap])/sqrt(2.)
+			temp[k] <- (temp[k] + temp[k - gap])/sqrt(2.)
+		}
+		for(k in (2. * gap - 1.):1.)
+			d[( - j - 1.) * TT + k] <- d[( - j - 1.) * TT + 2. * gap]
+	}
+	S <- d^2.
+	return(list(TT=TT, S=S))
+}
+
+
+
+#lsws826<- data
+
+
+lsws826.mean.s8.new<-rep(9,500)
+lsws826.std.s8.new<-rep(9,500)
+for (i in 1:500){
+	sp<-own.modwt(x=lsws826[1:(999+i)],wave="s8")
+	cat(i,":",length(sp$S),"\n")
+	adj<-adjust.new.new(x=lsws826[1:(999+i)],wave="s8",sp=sp,h=1,start.p=1)
+	bestp<-adj$p[length(adj$xhat)+1]
+	bestg<-adj$g[length(adj$xhat)+1]
+	pre.s8<-pred.new.new(lsws826[1:(999+i)],wave="s8",sp=sp,h=1,p=bestp,g=bestg)
+	lsws826.mean.s8.new[i]<-pre.s8$mean
+	lsws826.std.s8.new[i]<-pre.s8$std.err
+}
+
